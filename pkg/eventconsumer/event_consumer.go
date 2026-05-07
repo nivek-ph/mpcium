@@ -158,6 +158,34 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 
 	walletID := msg.WalletID
 
+	storedWalletCreationResult, storedWalletCreationResultError := ec.node.GetWalletCreationResult(walletID)
+
+	// Error when retrieving wallet creation result for the wallet ID
+	if storedWalletCreationResultError != nil {
+		ec.handleKeygenSessionError(walletID, storedWalletCreationResultError, "Failed to check stored wallet creation result", natMsg)
+		return
+	}
+
+	// Replay the wallet creation result if it already exists for the wallet ID
+	// TODO
+	// 1. to inspect storedWalletCreationResult
+	// 2. to move the following duplicate logic (line 341~351) into a func
+	if storedWalletCreationResult != nil {
+		logger.Info("storedWalletCreationResult", storedWalletCreationResult)
+
+		key := event.KeygenResultSubject(natMsg.Header.Get(event.ClientIDHeader), walletID)
+		if err := ec.genKeyResultQueue.Enqueue(key, storedWalletCreationResult, &messaging.EnqueueOptions{
+			IdempotententKey: composeKeygenIdempotentKey(walletID, natMsg),
+		}); err != nil {
+			logger.Error("Failed to enqueue stored wallet creation result", err, "walletID", walletID)
+			ec.handleKeygenSessionError(walletID, err, "Failed to enqueue stored wallet creation result", natMsg)
+			return
+		}
+		ec.sendReplyToRemoveMsg(natMsg)
+		logger.Info("Returned stored wallet creation result for existing wallet", "walletID", walletID)
+		return
+	}
+
 	// Guard against duplicate keygen sessions for the same walletID.
 	// Under heavy load, the keygen consumer may NAK and JetStream redelivers,
 	// creating a second session on the same NATS topics which causes VSS verify failures.
@@ -272,6 +300,8 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 		return
 	}
 
+	// Store wallet creation result
+	logger.Info("payload", payload)
 	if storeErr := ec.node.StoreWalletCreationResult(walletID, payload); storeErr != nil {
 		logger.Error("Failed to store wallet creation result", storeErr, "walletID", walletID)
 		ec.handleKeygenSessionError(walletID, storeErr, "Failed to store wallet creation result", natMsg)

@@ -14,6 +14,7 @@ import (
 
 func TestKeyGeneration(t *testing.T) {
 	suite := NewE2ETestSuite(".")
+	logger.Init("dev", true)
 
 	// Comprehensive cleanup before starting tests
 	t.Log("Performing pre-test cleanup...")
