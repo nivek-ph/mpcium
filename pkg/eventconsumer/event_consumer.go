@@ -274,6 +274,8 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 
 	if storeErr := ec.node.StoreWalletCreationResult(walletID, payload); storeErr != nil {
 		logger.Error("Failed to store wallet creation result", storeErr, "walletID", walletID)
+		ec.handleKeygenSessionError(walletID, storeErr, "Failed to store wallet creation result", natMsg)
+		return
 	}
 
 	key := event.KeygenResultSubject(natMsg.Header.Get(event.ClientIDHeader), walletID)
