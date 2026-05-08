@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/fystack/mpcium/pkg/event"
 	"github.com/fystack/mpcium/pkg/identity"
 	"github.com/fystack/mpcium/pkg/logger"
@@ -161,7 +162,7 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 	storedWalletCreationResult, storedWalletCreationResultError := ec.node.GetWalletCreationResult(walletID)
 
 	// Error when retrieving wallet creation result for the wallet ID
-	if storedWalletCreationResultError != nil {
+	if storedWalletCreationResultError != nil && !errors.Is(storedWalletCreationResultError, badger.ErrKeyNotFound) {
 		ec.handleKeygenSessionError(walletID, storedWalletCreationResultError, "Failed to check stored wallet creation result", natMsg)
 		return
 	}
