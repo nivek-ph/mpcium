@@ -159,6 +159,7 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 
 	walletID := msg.WalletID
 
+	// Attempt to get previously stored wallet creation result (if any) by the wallet ID
 	storedWalletCreationResult, storedWalletCreationResultError := ec.node.GetWalletCreationResult(walletID)
 
 	// Error when retrieving wallet creation result for the wallet ID
@@ -168,12 +169,8 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 	}
 
 	// Replay the wallet creation result if it already exists for the wallet ID
-	// TODO
-	// 1. to inspect storedWalletCreationResult
-	// 2. to move the following duplicate logic (line 341~351) into a func
+	// TODO: to move the following duplicate logic (line 308 and line 341) into a func
 	if storedWalletCreationResult != nil {
-		logger.Info("storedWalletCreationResult", storedWalletCreationResult)
-
 		key := event.KeygenResultSubject(natMsg.Header.Get(event.ClientIDHeader), walletID)
 		if err := ec.genKeyResultQueue.Enqueue(key, storedWalletCreationResult, &messaging.EnqueueOptions{
 			IdempotententKey: composeKeygenIdempotentKey(walletID, natMsg),
@@ -302,7 +299,6 @@ func (ec *eventConsumer) handleKeyGenEvent(natMsg *nats.Msg) {
 	}
 
 	// Store wallet creation result
-	logger.Info("payload", payload)
 	if storeErr := ec.node.StoreWalletCreationResult(walletID, payload); storeErr != nil {
 		logger.Error("Failed to store wallet creation result", storeErr, "walletID", walletID)
 		ec.handleKeygenSessionError(walletID, storeErr, "Failed to store wallet creation result", natMsg)
